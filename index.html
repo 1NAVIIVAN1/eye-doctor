@@ -3,434 +3,371 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f3f1">
-  <title>Zero Out</title>
+  <meta name="theme-color" content="#f4f4f1">
+  <title>Танчики</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #f3f3f1;
-      --surface: #ffffff;
-      --ink: #161616;
-      --muted: #9a9a96;
-      --faint: #e2e2de;
-      --accent: #ff5a36;
-      --accent-ink: #ffffff;
-      --accent-soft: rgba(255, 90, 54, 0.14);
-      --ball: min(36vw, 21vh, 168px);
+      --bg: #f4f4f1;
+      --panel: #ebebe6;
+      --ink: #1a1a1a;
+      --muted: #9b9b95;
+      --btn: #ffffff;
+      --blue: #2f6bff;
+      --red: #ff3b4e;
     }
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --bg: #131313;
-        --surface: #1d1d1c;
-        --ink: #f1f1ee;
-        --muted: #6d6d69;
-        --faint: #2c2c2a;
-        --accent-soft: rgba(255, 90, 54, 0.2);
-      }
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     [hidden] { display: none !important; }
     html, body { height: 100%; }
     body {
       font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-      overflow: hidden;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-      touch-action: none;
+      background: var(--bg); color: var(--ink);
+      overflow: hidden; touch-action: none;
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
+    #app { height: 100%; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; }
 
-    #app {
-      height: 100%;
-      max-width: 480px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      padding: max(14px, env(safe-area-inset-top)) 16px max(14px, env(safe-area-inset-bottom));
+    .panel {
+      flex: none; height: 176px; background: var(--panel);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 18px max(12px, env(safe-area-inset-bottom));
     }
+    .panel.p2 { transform: rotate(180deg); padding-bottom: max(12px, env(safe-area-inset-top)); }
 
-    /* top bar */
-    .top { display: flex; align-items: center; justify-content: space-between; height: 48px; }
-    .coins { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .coin { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); flex: none; }
-    .coins.bump { animation: bump .35s ease; }
-    @keyframes bump { 40% { transform: scale(1.12); } }
-    .btn {
-      font: inherit; font-size: 15px; font-weight: 600; color: var(--ink);
-      background: var(--surface); border: 1px solid var(--faint); border-radius: 999px;
-      height: 40px; padding: 0 16px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    .dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); gap: 4px; }
+    .dir {
+      background: var(--btn); border: 0; border-radius: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; touch-action: none;
+      box-shadow: 0 2px 0 rgba(0,0,0,.08);
     }
-    .btn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    .dir svg { width: 22px; height: 22px; fill: var(--ink); }
+    .dir.on { background: var(--c); }
+    .dir.on svg { fill: #fff; }
+    .dir[data-d=up] { grid-area: 1 / 2; }
+    .dir[data-d=left] { grid-area: 2 / 1; }
+    .dir[data-d=right] { grid-area: 2 / 3; }
+    .dir[data-d=down] { grid-area: 3 / 2; }
 
-    .hint { text-align: center; color: var(--muted); font-size: 14px; height: 20px; margin-top: 6px; transition: opacity .3s; }
+    .info { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .name { font-size: 14px; font-weight: 700; color: var(--c); text-transform: uppercase; letter-spacing: .1em; }
+    .lives { display: flex; gap: 8px; }
+    .life { width: 22px; height: 22px; border-radius: 6px; background: var(--c); transition: background .2s, transform .3s; }
+    .life.lost { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); transform: scale(.8); }
 
-    /* balls */
-    .field {
-      flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-      place-items: center; min-height: 0;
+    .fire {
+      width: 92px; height: 92px; border-radius: 50%; border: 0; cursor: pointer; touch-action: none;
+      background: var(--c); color: #fff; font: inherit; font-size: 15px; font-weight: 800; letter-spacing: .06em;
+      box-shadow: 0 4px 0 rgba(0,0,0,.18);
     }
-    .slot { position: relative; width: var(--ball); height: var(--ball); }
-    .ball {
-      position: absolute; inset: 0; border-radius: 50%;
-      background: var(--surface);
-      border: 2px solid var(--faint);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      cursor: pointer; touch-action: none;
-      transition: transform .25s cubic-bezier(.3,1.4,.5,1), opacity .25s, border-color .2s, background .25s, box-shadow .3s;
-      opacity: .5;
-      will-change: transform;
-    }
-    .field.none-active .ball { opacity: 1; }
-    .ball.active { opacity: 1; border-color: var(--accent); border-width: 3px; box-shadow: 0 0 0 8px var(--accent-soft); }
-    .ball.ready {
-      opacity: 1; background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
-      box-shadow: 0 0 0 10px var(--accent-soft), 0 10px 40px rgba(255, 90, 54, .45);
-      animation: glow 1.6s ease-in-out infinite; cursor: grab;
-    }
-    @keyframes glow { 50% { box-shadow: 0 0 0 16px var(--accent-soft), 0 10px 50px rgba(255, 90, 54, .6); } }
-    .ball.dragging { transition: none; animation: none; z-index: 10; cursor: grabbing; }
-    .ball.nudge { transition: none; }
-    .ball.spawn { animation: spawn .4s cubic-bezier(.3,1.5,.5,1); }
-    @keyframes spawn { from { transform: scale(0); opacity: 0; } }
-    .num {
-      font-size: calc(var(--ball) * 0.27); font-weight: 800; letter-spacing: -0.03em;
-      font-variant-numeric: tabular-nums; line-height: 1;
-    }
-    .num.tick { animation: tick .18s ease; }
-    @keyframes tick { 50% { transform: scale(1.08); } }
-    .reward { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 5px; }
-    .reward::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-    .ball.ready .reward { color: var(--accent-ink); }
-    .ball.ready .reward::before { background: var(--accent-ink); }
-    .delta {
-      position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
-      font-size: 15px; font-weight: 700; color: var(--accent); pointer-events: none;
-      animation: rise .6s ease forwards;
-    }
-    @keyframes rise { to { transform: translate(-50%, -26px); opacity: 0; } }
+    .fire.on { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.18); }
 
-    /* step slider */
-    .stepper { padding: 8px 4px 0; }
-    .step-head { display: flex; align-items: baseline; justify-content: space-between; }
-    .step-label { color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
-    .step-value { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-    input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 36px; background: transparent; cursor: pointer; touch-action: pan-x; }
-    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--faint); }
-    input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--faint); }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -11px; border-radius: 50%; background: var(--accent); border: 0; }
-    input[type=range]::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); border: 0; }
-    input[type=range]:disabled { opacity: .5; cursor: default; }
-    .ticks { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted); padding: 0 6px; }
-    .ticks span.on { color: var(--ink); }
-    .ticks span.off { opacity: .45; }
+    .p1 { --c: var(--blue); }
+    .p2 { --c: var(--red); }
 
-    /* basket */
-    .basket {
-      margin-top: 14px; height: 92px; border-radius: 24px; flex: none;
-      border: 2px dashed var(--faint); position: relative;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      color: var(--muted); font-size: 14px; font-weight: 600;
-      transition: border-color .2s, background .2s, transform .2s;
-    }
-    .basket svg { width: 34px; height: 34px; }
-    .basket.armed { border-color: var(--accent); color: var(--accent); }
-    .basket.over { background: var(--accent-soft); transform: scale(1.03); }
-    .basket.land { animation: land .4s ease; }
-    @keyframes land { 30% { transform: scaleY(.9) scaleX(1.04); } 60% { transform: scaleY(1.03); } }
-    .pop {
-      position: absolute; left: 50%; top: 0; transform: translate(-50%, -10px);
-      font-size: 28px; font-weight: 800; color: var(--accent); pointer-events: none;
-      animation: pop .9s cubic-bezier(.2,.8,.3,1) forwards;
-    }
-    @keyframes pop { 0% { opacity: 0; transform: translate(-50%, 0) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -24px) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -70px) scale(1); } }
-    .splash { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); pointer-events: none; }
+    .field { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+    canvas { display: block; border-radius: 6px; }
 
-    /* upgrade sheet */
-    .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; justify-content: center; z-index: 50; animation: fade .2s; }
+    .overlay {
+      position: fixed; inset: 0; z-index: 10; background: rgba(244,244,241,.92);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+      animation: fade .3s ease;
+    }
     @keyframes fade { from { opacity: 0; } }
-    .sheet {
-      width: 100%; max-width: 480px; background: var(--surface); border-radius: 28px 28px 0 0;
-      padding: 24px 16px max(24px, env(safe-area-inset-bottom)); animation: up .3s cubic-bezier(.2,.9,.3,1);
+    .win { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: var(--c); text-align: center; }
+    .win.flip { transform: rotate(180deg); }
+    .again {
+      font: inherit; font-size: 18px; font-weight: 700; color: #fff; background: var(--ink);
+      border: 0; border-radius: 999px; height: 56px; padding: 0 32px; cursor: pointer;
     }
-    @keyframes up { from { transform: translateY(100%); } }
-    .sheet h2 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-    .sheet p { color: var(--muted); font-size: 14px; margin-bottom: 18px; }
-    .lvl { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--faint); }
-    .lvl-step { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .lvl-state { font-size: 14px; color: var(--muted); font-weight: 600; }
-    .buy { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-    .buy:disabled { background: var(--faint); color: var(--muted); border-color: var(--faint); cursor: default; }
-    .close { width: 100%; justify-content: center; margin-top: 12px; height: 48px; }
   </style>
 </head>
 <body>
   <div id="app">
-    <div class="top">
-      <div class="coins" id="coins"><span class="coin"></span><span id="coinVal">0</span></div>
-      <button class="btn" id="upBtn"><span class="dot" id="upDot" hidden></span>Прокачка</button>
-    </div>
-    <div class="hint" id="hint">Тапните шарик, свайпайте влево/вправо</div>
-
-    <div class="field none-active" id="field"></div>
-
-    <div class="stepper">
-      <div class="step-head">
-        <span class="step-label">Шаг</span>
-        <span class="step-value" id="stepVal">0.1</span>
-      </div>
-      <input type="range" id="stepRange" min="0" max="0" step="1" value="0" aria-label="Шаг">
-      <div class="ticks" id="ticks"></div>
-    </div>
-
-    <div class="basket" id="basket">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18l-2 11H5L3 9z"/><path d="M8 9l4-6 4 6"/></svg>
-      <span>Корзина</span>
-    </div>
+    <div class="panel p2" data-p="1"></div>
+    <div class="field" id="field"><canvas id="cv"></canvas></div>
+    <div class="panel p1" data-p="0"></div>
   </div>
 
-  <div class="scrim" id="scrim" hidden>
-    <div class="sheet">
-      <h2>Прокачка</h2>
-      <p>Больший шаг — быстрее к нулю и крупнее числа.</p>
-      <div id="levels"></div>
-      <button class="btn close" id="closeBtn">Готово</button>
-    </div>
+  <div class="overlay" id="over" hidden>
+    <div class="win flip" id="winTop"></div>
+    <button class="again" id="again">Играть снова</button>
+    <div class="win" id="winBot"></div>
   </div>
 
   <script>
-    // all values are integer tenths: 25 === 2.5
-    const STEPS = [1, 5, 10, 20, 50];
-    const COSTS = [0, 40, 160, 550, 1800];
-    const RANGE_CAP = [20, 60, 140, 300, 700];
-    const SAVE_KEY = "zero-out-v1";
+    const W = 12, H = 16;
+    const TANK = 0.78, SPEED = 3.2, BULLET_SPEED = 10, BULLET_R = 0.12;
+    const COOLDOWN = 0.35, MAX_BULLETS = 2, INVULN = 1.0, LIVES = 3;
+    const PLAYERS = [
+      { name: "Синий", color: "#2f6bff", dark: "#1c47b8" },
+      { name: "Красный", color: "#ff3b4e", dark: "#b81f30" },
+    ];
+    const VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    const ANGLE = { up: -Math.PI / 2, down: Math.PI / 2, left: Math.PI, right: 0 };
+    // player 2 sits opposite, so their local directions are rotated 180° on screen
+    const FLIP = { up: "down", down: "up", left: "right", right: "left" };
 
+    // bottom half (rows 8..15); top half is the 180° rotation for a fair map
+    const BOTTOM = [
+      "....#..#....",
+      ".##......##.",
+      ".#...##...#.",
+      "............",
+      "...#....#...",
+      "..#......#..",
+      "............",
+      "............",
+    ];
+    const MAP = [...BOTTOM.map(r => [...r].reverse().join("")).reverse(), ...BOTTOM];
+    const wall = (cx, cy) => cx < 0 || cy < 0 || cx >= W || cy >= H || MAP[cy][cx] === "#";
+
+    let tanks, bullets, sparks, over, shake;
+
+    function reset() {
+      tanks = [
+        { x: 6, y: 14.5, dir: "up", lives: LIVES, cool: 0, inv: 0, held: [], fire: false },
+        { x: 6, y: 1.5, dir: "down", lives: LIVES, cool: 0, inv: 0, held: [], fire: false },
+      ];
+      bullets = []; sparks = []; over = false; shake = 0;
+      document.querySelectorAll(".on").forEach(b => b.classList.remove("on"));
+      $("over").hidden = true;
+      renderLives();
+    }
     const $ = id => document.getElementById(id);
-    const field = $("field"), basket = $("basket"), range = $("stepRange");
 
-    let state = load() || { coins: 0, level: 0, stepIdx: 0, dropped: 0, balls: [], active: -1 };
-    while (state.balls.length < 4) state.balls.push(newBall());
+    /* ---------- controls ---------- */
+    const ARROW = '<svg viewBox="0 0 24 24"><path d="M12 5l8 11H4z"/></svg>';
+    const ROT = { up: 0, right: 90, down: 180, left: 270 };
+    document.querySelectorAll(".panel").forEach(panel => {
+      const p = +panel.dataset.p;
+      panel.innerHTML = `
+        <div class="dpad">${["up", "left", "right", "down"].map(d =>
+          `<button class="dir" data-d="${d}" aria-label="${d}">${ARROW}</button>`).join("")}</div>
+        <div class="info"><div class="name">${PLAYERS[p].name}</div><div class="lives">${'<span class="life"></span>'.repeat(LIVES)}</div></div>
+        <button class="fire" aria-label="Огонь">ОГОНЬ</button>`;
+      panel.querySelectorAll(".dir").forEach(btn => {
+        btn.querySelector("svg").style.transform = `rotate(${ROT[btn.dataset.d]}deg)`;
+        const d = p === 1 ? FLIP[btn.dataset.d] : btn.dataset.d;
+        hold(btn, () => press(p, d), () => release(p, d));
+      });
+      hold(panel.querySelector(".fire"), () => { tanks[p].fire = true; }, () => { tanks[p].fire = false; });
+    });
 
-    function load() {
-      try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s && Array.isArray(s.balls) ? s : null; }
-      catch { return null; }
+    function hold(btn, down, up) {
+      btn.addEventListener("pointerdown", e => {
+        e.preventDefault();
+        btn.setPointerCapture(e.pointerId);
+        btn.classList.add("on");
+        down();
+      });
+      const end = () => { if (btn.classList.contains("on")) { btn.classList.remove("on"); up(); } };
+      btn.addEventListener("pointerup", end);
+      btn.addEventListener("pointercancel", end);
+      btn.addEventListener("lostpointercapture", end);
+      btn.addEventListener("contextmenu", e => e.preventDefault());
     }
-    function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {} }
+    function press(p, d) { const h = tanks[p].held; if (!h.includes(d)) h.push(d); }
+    function release(p, d) { const h = tanks[p].held, i = h.indexOf(d); if (i >= 0) h.splice(i, 1); }
 
-    function maxAbs() { return Math.min(RANGE_CAP[state.level], 10 + Math.floor(state.dropped * 1.5)); }
-    function newBall() {
-      const m = maxAbs();
-      let v = 0;
-      while (v === 0) v = Math.round((Math.random() * 2 - 1) * m);
-      return { v, v0: v };
+    const KEYS = {
+      KeyW: [0, "up"], KeyS: [0, "down"], KeyA: [0, "left"], KeyD: [0, "right"], Space: [0, "fire"],
+      ArrowUp: [1, "up"], ArrowDown: [1, "down"], ArrowLeft: [1, "left"], ArrowRight: [1, "right"], Enter: [1, "fire"],
+    };
+    addEventListener("keydown", e => {
+      const k = KEYS[e.code]; if (!k || e.repeat) return;
+      e.preventDefault();
+      k[1] === "fire" ? (tanks[k[0]].fire = true) : press(k[0], k[1]);
+    });
+    addEventListener("keyup", e => {
+      const k = KEYS[e.code]; if (!k) return;
+      k[1] === "fire" ? (tanks[k[0]].fire = false) : release(k[0], k[1]);
+    });
+
+    /* ---------- physics ---------- */
+    function blocked(x, y, self) {
+      const h = TANK / 2;
+      if (x - h < 0 || y - h < 0 || x + h > W || y + h > H) return true;
+      for (let cy = Math.floor(y - h); cy <= Math.floor(y + h - 1e-6); cy++)
+        for (let cx = Math.floor(x - h); cx <= Math.floor(x + h - 1e-6); cx++)
+          if (wall(cx, cy)) return true;
+      const o = tanks[1 - self];
+      return Math.abs(o.x - x) < TANK && Math.abs(o.y - y) < TANK;
     }
-    const reward = b => 1 + Math.floor(Math.abs(b.v0) * 0.3);
-    const fmt = t => t === 0 ? "0" : (t > 0 ? "+" : "−") + (Math.abs(t) / 10).toFixed(1);
-    const step = () => STEPS[state.stepIdx];
+
+    function moveTank(t, i, dt) {
+      const d = t.held[t.held.length - 1];
+      if (!d) return;
+      t.dir = d;
+      const [vx, vy] = VEC[d], s = SPEED * dt;
+      const nx = t.x + vx * s, ny = t.y + vy * s;
+      if (!blocked(nx, ny, i)) { t.x = nx; t.y = ny; return; }
+      // corner assist: slide toward the lane center so 1-cell gaps are easy to enter
+      if (vx) {
+        const c = Math.floor(t.y) + 0.5, off = c - t.y;
+        if (Math.abs(off) > 1e-3 && Math.abs(off) < 0.42 && !blocked(t.x, t.y + Math.sign(off) * Math.min(s, Math.abs(off)), i))
+          t.y += Math.sign(off) * Math.min(s, Math.abs(off));
+      } else {
+        const c = Math.floor(t.x) + 0.5, off = c - t.x;
+        if (Math.abs(off) > 1e-3 && Math.abs(off) < 0.42 && !blocked(t.x + Math.sign(off) * Math.min(s, Math.abs(off)), t.y, i))
+          t.x += Math.sign(off) * Math.min(s, Math.abs(off));
+      }
+    }
+
+    function shoot(t, i) {
+      if (t.cool > 0 || bullets.filter(b => b.owner === i).length >= MAX_BULLETS) return;
+      t.cool = COOLDOWN;
+      const [vx, vy] = VEC[t.dir];
+      const bx = t.x + vx * 0.55, by = t.y + vy * 0.55;
+      if (wall(Math.floor(bx), Math.floor(by))) return spark(bx, by, PLAYERS[i].color);
+      bullets.push({ x: bx, y: by, vx: vx * BULLET_SPEED, vy: vy * BULLET_SPEED, owner: i });
+    }
+
+    function spark(x, y, color, n = 6) {
+      for (let k = 0; k < n; k++) {
+        const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 3;
+        sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35, color });
+      }
+    }
+
+    function hit(i, b) {
+      const t = tanks[i];
+      t.lives--; t.inv = INVULN; shake = 0.25;
+      spark(b.x, b.y, PLAYERS[i].color, 14);
+      try { navigator.vibrate && navigator.vibrate(80); } catch {}
+      renderLives();
+      if (t.lives <= 0) {
+        over = true;
+        setTimeout(() => showWinner(1 - i), 700);
+      }
+    }
+
+    function update(dt) {
+      tanks.forEach((t, i) => {
+        t.cool = Math.max(0, t.cool - dt);
+        t.inv = Math.max(0, t.inv - dt);
+        if (over) return;
+        moveTank(t, i, dt);
+        if (t.fire) shoot(t, i);
+      });
+
+      // substep bullets so fast shots never tunnel through a wall
+      const steps = 4;
+      for (let s = 0; s < steps; s++) {
+        for (const b of bullets) {
+          if (b.dead) continue;
+          b.x += b.vx * dt / steps; b.y += b.vy * dt / steps;
+          if (wall(Math.floor(b.x), Math.floor(b.y))) { b.dead = true; spark(b.x, b.y, "#8a8a84"); continue; }
+          tanks.forEach((t, i) => {
+            if (b.dead || i === b.owner || t.lives <= 0) return;
+            const h = TANK / 2 + BULLET_R;
+            if (Math.abs(b.x - t.x) < h && Math.abs(b.y - t.y) < h) {
+              b.dead = true;
+              if (t.inv <= 0 && !over) hit(i, b); else spark(b.x, b.y, "#8a8a84");
+            }
+          });
+        }
+        for (let a = 0; a < bullets.length; a++)
+          for (let c = a + 1; c < bullets.length; c++) {
+            const p = bullets[a], q = bullets[c];
+            if (!p.dead && !q.dead && p.owner !== q.owner && Math.hypot(p.x - q.x, p.y - q.y) < BULLET_R * 2.5) {
+              p.dead = q.dead = true; spark((p.x + q.x) / 2, (p.y + q.y) / 2, "#8a8a84", 8);
+            }
+          }
+      }
+      bullets = bullets.filter(b => !b.dead);
+
+      sparks.forEach(s => { s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; });
+      sparks = sparks.filter(s => s.life > 0);
+      shake = Math.max(0, shake - dt);
+    }
 
     /* ---------- render ---------- */
-    const els = [];
-    function buildField() {
-      field.innerHTML = "";
-      for (let i = 0; i < 4; i++) {
-        const slot = document.createElement("div");
-        slot.className = "slot";
-        const ball = document.createElement("div");
-        ball.className = "ball";
-        ball.innerHTML = '<span class="num"></span><span class="reward"></span>';
-        slot.appendChild(ball);
-        field.appendChild(slot);
-        els[i] = ball;
-        bindBall(ball, i);
-        renderBall(i);
-      }
+    const cv = $("cv"), ctx = cv.getContext("2d");
+    let U = 30;
+    function resize() {
+      const r = $("field").getBoundingClientRect();
+      U = Math.max(8, Math.floor(Math.min((r.width - 16) / W, (r.height - 16) / H)));
+      const dpr = window.devicePixelRatio || 1;
+      cv.style.width = W * U + "px"; cv.style.height = H * U + "px";
+      cv.width = W * U * dpr; cv.height = H * U * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    function renderBall(i) {
-      const b = state.balls[i], el = els[i];
-      el.querySelector(".num").textContent = fmt(b.v);
-      el.querySelector(".reward").textContent = reward(b);
-      el.classList.toggle("ready", b.v === 0);
-      el.classList.toggle("active", i === state.active && b.v !== 0);
-    }
-    function renderAll() {
-      state.balls.forEach((_, i) => renderBall(i));
-      field.classList.toggle("none-active", state.active < 0 || state.balls[state.active].v === 0);
-      $("coinVal").textContent = state.coins;
-      range.max = state.level;
-      range.value = state.stepIdx;
-      range.disabled = state.level === 0;
-      $("stepVal").textContent = (step() / 10).toFixed(1);
-      $("ticks").innerHTML = STEPS.map((s, i) =>
-        `<span class="${i === state.stepIdx ? "on" : i > state.level ? "off" : ""}">${(s / 10).toFixed(1)}</span>`).join("");
-      $("upDot").hidden = !(state.level < STEPS.length - 1 && state.coins >= COSTS[state.level + 1]);
-      basket.classList.toggle("armed", state.balls.some(b => b.v === 0));
-      save();
-    }
-    function setHint(t) { $("hint").textContent = t; }
+    addEventListener("resize", resize);
 
-    /* ---------- actions ---------- */
-    function select(i) {
-      if (state.balls[i].v === 0) return;
-      state.active = i;
-      renderAll();
-    }
-    function apply(i, dir) {
-      const b = state.balls[i];
-      if (b.v === 0) return;
-      state.active = i;
-      b.v = Math.max(-9999, Math.min(9999, b.v + dir * step()));
-      const num = els[i].querySelector(".num");
-      num.classList.remove("tick"); void num.offsetWidth; num.classList.add("tick");
-      const d = document.createElement("span");
-      d.className = "delta";
-      d.textContent = (dir > 0 ? "+" : "−") + (step() / 10).toFixed(1);
-      els[i].parentElement.appendChild(d);
-      setTimeout(() => d.remove(), 600);
-      if (b.v === 0) setHint("Готово! Перетащите шарик в корзину");
-      else setHint(b.v * b.v0 < 0 ? "Перелёт — вернитесь назад" : "Тапните шарик, свайпайте влево/вправо");
-      renderAll();
+    function rrect(x, y, w, h, r) {
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); ctx.fill();
     }
 
-    /* ---------- pointer handling ---------- */
-    function bindBall(el, i) {
-      let sx, sy, mode = null, id = null;
-      el.addEventListener("pointerdown", e => {
-        if (el.classList.contains("falling")) return;
-        id = e.pointerId; sx = e.clientX; sy = e.clientY;
-        mode = state.balls[i].v === 0 ? "drag" : "swipe";
-        el.setPointerCapture(id);
-        el.classList.add(mode === "drag" ? "dragging" : "nudge");
+    function draw() {
+      ctx.save();
+      if (shake > 0) ctx.translate((Math.random() - .5) * shake * 16, (Math.random() - .5) * shake * 16);
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W * U, H * U);
+
+      ctx.strokeStyle = "#e6e6e0"; ctx.lineWidth = 2; ctx.setLineDash([8, 8]);
+      ctx.beginPath(); ctx.moveTo(0, H / 2 * U); ctx.lineTo(W * U, H / 2 * U); ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#d4d4cd";
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+        if (MAP[y][x] === "#") rrect(x * U + 1.5, y * U + 1.5, U - 3, U - 3, U * 0.18);
+
+      tanks.forEach((t, i) => {
+        if (t.lives <= 0) { ctx.globalAlpha = 0.25; }
+        else if (t.inv > 0 && Math.floor(t.inv * 12) % 2) return;
+        const P = PLAYERS[i], s = TANK * U;
+        ctx.save();
+        ctx.translate(t.x * U, t.y * U);
+        ctx.rotate(ANGLE[t.dir]);
+        ctx.fillStyle = P.color; rrect(-s / 2, -s / 2, s, s, s * 0.18);
+        ctx.fillStyle = P.dark;
+        rrect(0, -s * 0.09, s * 0.72, s * 0.18, s * 0.05);
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.26, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
       });
-      el.addEventListener("pointermove", e => {
-        if (e.pointerId !== id || !mode) return;
-        const dx = e.clientX - sx, dy = e.clientY - sy;
-        if (mode === "drag") {
-          el.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
-          basket.classList.toggle("over", overBasket(e.clientX, e.clientY));
-        } else {
-          el.style.transform = `translateX(${Math.max(-28, Math.min(28, dx * 0.35))}px)`;
-        }
+
+      bullets.forEach(b => {
+        ctx.fillStyle = PLAYERS[b.owner].dark;
+        ctx.beginPath(); ctx.arc(b.x * U, b.y * U, BULLET_R * U, 0, Math.PI * 2); ctx.fill();
       });
-      const end = e => {
-        if (e.pointerId !== id || !mode) return;
-        const dx = e.clientX - sx, dy = e.clientY - sy, m = mode;
-        mode = null; id = null;
-        el.classList.remove("nudge");
-        if (m === "drag") {
-          basket.classList.remove("over");
-          if (e.type === "pointerup" && overBasket(e.clientX, e.clientY)) return drop(i, dx, dy);
-          el.classList.remove("dragging");
-          el.style.transform = "";
-          if (Math.hypot(dx, dy) < 8) setHint("Перетащите шарик в корзину");
-          return;
-        }
-        el.style.transform = "";
-        if (e.type !== "pointerup") return;
-        if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy)) apply(i, dx > 0 ? 1 : -1);
-        else if (Math.hypot(dx, dy) < 12) select(i);
-      };
-      el.addEventListener("pointerup", end);
-      el.addEventListener("pointercancel", end);
-    }
-    function overBasket(x, y) {
-      const r = basket.getBoundingClientRect();
-      return x > r.left - 10 && x < r.right + 10 && y > r.top - 30 && y < r.bottom + 10;
+
+      sparks.forEach(s => {
+        ctx.globalAlpha = Math.max(0, s.life / 0.35);
+        ctx.fillStyle = s.color;
+        ctx.fillRect(s.x * U - 2, s.y * U - 2, 4, 4);
+      });
+      ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
-    /* ---------- drop with gravity ---------- */
-    function drop(i, ox, oy) {
-      const el = els[i], b = state.balls[i];
-      el.classList.add("falling");
-      const r = el.getBoundingClientRect(), br = basket.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      const tx = br.left + br.width / 2 - cx, ty = br.top + br.height * 0.55 - cy;
-      const T = 0.45, vy0 = -260, g = 2 * (ty - vy0 * T) / (T * T);
-      const t0 = performance.now();
-      (function frame(now) {
-        const t = Math.min((now - t0) / 1000, T), k = t / T;
-        const x = ox + tx * k, y = oy + vy0 * t + 0.5 * g * t * t;
-        el.style.transform = `translate(${x}px, ${y}px) scale(${1.05 - 0.75 * k})`;
-        if (t < T) return requestAnimationFrame(frame);
-        land(i, reward(b));
-      })(t0);
-    }
-    function land(i, coins) {
-      const el = els[i];
-      el.style.opacity = "0";
-      basket.classList.remove("land"); void basket.offsetWidth; basket.classList.add("land");
-      const p = document.createElement("div");
-      p.className = "pop"; p.textContent = "+" + coins;
-      basket.appendChild(p);
-      setTimeout(() => p.remove(), 900);
-      for (let k = 0; k < 8; k++) {
-        const s = document.createElement("div");
-        s.className = "splash";
-        s.style.left = "50%"; s.style.top = "50%";
-        basket.appendChild(s);
-        const a = Math.PI + (k / 7) * Math.PI, d = 40 + Math.random() * 30;
-        s.animate([{ transform: "translate(-50%,-50%) scale(1)", opacity: 1 },
-                   { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(.3)`, opacity: 0 }],
-                  { duration: 500, easing: "cubic-bezier(.2,.8,.3,1)" }).onfinish = () => s.remove();
-      }
-      state.coins += coins;
-      state.dropped++;
-      const c = $("coins"); c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump");
-      state.balls[i] = newBall();
-      if (state.active === i) state.active = -1;
-      setHint("Тапните шарик, свайпайте влево/вправо");
-      setTimeout(() => {
-        el.classList.remove("dragging", "falling", "spawn");
-        el.style.transform = ""; el.style.opacity = "";
-        void el.offsetWidth; el.classList.add("spawn");
-      }, 250);
-      renderAll();
+    function renderLives() {
+      document.querySelectorAll(".panel").forEach(panel => {
+        const t = tanks[+panel.dataset.p];
+        panel.querySelectorAll(".life").forEach((el, k) => el.classList.toggle("lost", k >= t.lives));
+      });
     }
 
-    /* ---------- step slider ---------- */
-    range.addEventListener("input", () => {
-      state.stepIdx = Math.min(+range.value, state.level);
-      renderAll();
-    });
-
-    /* ---------- upgrades ---------- */
-    function renderLevels() {
-      $("levels").innerHTML = STEPS.map((s, i) => {
-        const owned = i <= state.level, next = i === state.level + 1;
-        const right = owned ? '<span class="lvl-state">Открыт</span>'
-          : next ? `<button class="btn buy" data-i="${i}" ${state.coins < COSTS[i] ? "disabled" : ""}><span class="coin" style="width:10px;height:10px;background:currentColor"></span>${COSTS[i]}</button>`
-          : `<span class="lvl-state">${COSTS[i]}</span>`;
-        return `<div class="lvl"><span class="lvl-step" style="${owned || next ? "" : "opacity:.4"}">${(s / 10).toFixed(1)}</span>${right}</div>`;
-      }).join("");
+    function showWinner(i) {
+      const P = PLAYERS[i], text = `${P.name} победил!`;
+      ["winTop", "winBot"].forEach(id => { $(id).textContent = text; $(id).style.setProperty("--c", P.color); });
+      $("over").hidden = false;
     }
-    $("levels").addEventListener("click", e => {
-      const btn = e.target.closest(".buy");
-      if (!btn) return;
-      const i = +btn.dataset.i;
-      if (i !== state.level + 1 || state.coins < COSTS[i]) return;
-      state.coins -= COSTS[i];
-      state.level = i;
-      state.stepIdx = i;
-      renderAll(); renderLevels();
-    });
-    $("upBtn").addEventListener("click", () => { renderLevels(); $("scrim").hidden = false; });
-    $("closeBtn").addEventListener("click", () => { $("scrim").hidden = true; });
-    $("scrim").addEventListener("click", e => { if (e.target.id === "scrim") $("scrim").hidden = true; });
+    $("again").addEventListener("click", reset);
 
-    /* ---------- keyboard ---------- */
-    document.addEventListener("keydown", e => {
-      if (e.key >= "1" && e.key <= "4") select(+e.key - 1);
-      if (state.active < 0) return;
-      if (e.key === "ArrowRight") apply(state.active, 1);
-      if (e.key === "ArrowLeft") apply(state.active, -1);
-    });
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
 
-    if (state.active >= 0 && state.balls[state.active].v === 0) state.active = -1;
-    buildField();
-    renderAll();
+    reset();
+    resize();
+    requestAnimationFrame(loop);
   </script>
 </body>
 </html>
