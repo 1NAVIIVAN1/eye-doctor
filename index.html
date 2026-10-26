@@ -13,10 +13,9 @@
       --bg: #f4f4f1;
       --panel: #ebebe6;
       --ink: #1a1a1a;
-      --muted: #9b9b95;
-      --btn: #ffffff;
       --blue: #2f6bff;
       --red: #ff3b4e;
+      --heat: #ff9f1a;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     [hidden] { display: none !important; }
@@ -30,43 +29,27 @@
     #app { height: 100%; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; }
 
     .panel {
-      flex: none; height: 176px; background: var(--panel);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 18px max(12px, env(safe-area-inset-bottom));
+      flex: none; height: 132px; background: var(--panel);
+      padding: 12px 16px max(12px, env(safe-area-inset-bottom));
     }
     .panel.p2 { transform: rotate(180deg); padding-bottom: max(12px, env(safe-area-inset-top)); }
-
-    .dpad { display: grid; grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); gap: 4px; }
-    .dir {
-      background: var(--btn); border: 0; border-radius: 12px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; touch-action: none;
-      box-shadow: 0 2px 0 rgba(0,0,0,.08);
-    }
-    .dir svg { width: 22px; height: 22px; fill: var(--ink); }
-    .dir.on { background: var(--c); }
-    .dir.on svg { fill: #fff; }
-    .dir[data-d=up] { grid-area: 1 / 2; }
-    .dir[data-d=left] { grid-area: 2 / 1; }
-    .dir[data-d=right] { grid-area: 2 / 3; }
-    .dir[data-d=down] { grid-area: 3 / 2; }
-
-    .info { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-    .name { font-size: 14px; font-weight: 700; color: var(--c); text-transform: uppercase; letter-spacing: .1em; }
-    .lives { display: flex; gap: 8px; }
-    .life { width: 22px; height: 22px; border-radius: 6px; background: var(--c); transition: background .2s, transform .3s; }
-    .life.lost { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); transform: scale(.8); }
-
-    .fire {
-      width: 92px; height: 92px; border-radius: 50%; border: 0; cursor: pointer; touch-action: none;
-      background: var(--c); color: #fff; font: inherit; font-size: 15px; font-weight: 800; letter-spacing: .06em;
-      box-shadow: 0 4px 0 rgba(0,0,0,.18);
-    }
-    .fire.on { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.18); }
-
     .p1 { --c: var(--blue); }
     .p2 { --c: var(--red); }
 
-    .field { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+    .pad {
+      width: 100%; height: 100%; border: 0; border-radius: 22px; cursor: pointer; touch-action: none;
+      background: var(--c); color: #fff; font: inherit;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      box-shadow: 0 5px 0 rgba(0,0,0,.18);
+      transition: transform .06s, box-shadow .06s, filter .2s;
+    }
+    .pad.on { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.18); }
+    .pad .name { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+    .pad .label { font-size: 26px; font-weight: 800; letter-spacing: .02em; }
+    .pad.hot { background: var(--heat); animation: blink .4s steps(2) infinite; }
+    @keyframes blink { 50% { filter: brightness(1.15); } }
+
+    .field { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
     canvas { display: block; border-radius: 6px; }
 
     .overlay {
@@ -85,9 +68,9 @@
 </head>
 <body>
   <div id="app">
-    <div class="panel p2" data-p="1"></div>
+    <div class="panel p2"><button class="pad" data-p="1"><span class="name">Красный</span><span class="label">ЖМИ</span></button></div>
     <div class="field" id="field"><canvas id="cv"></canvas></div>
-    <div class="panel p1" data-p="0"></div>
+    <div class="panel p1"><button class="pad" data-p="0"><span class="name">Синий</span><span class="label">ЖМИ</span></button></div>
   </div>
 
   <div class="overlay" id="over" hidden>
@@ -98,173 +81,148 @@
 
   <script>
     const W = 12, H = 16;
-    const TANK = 0.78, SPEED = 3.2, BULLET_SPEED = 10, BULLET_R = 0.12;
-    const COOLDOWN = 0.35, MAX_BULLETS = 2, INVULN = 1.0, LIVES = 3;
+    const R = 0.4, SPEED = 3, TURN = Math.PI * 1.1;
+    const BULLET_SPEED = 9, BULLET_R = 0.11;
+    const HEAT_PER_SHOT = 0.3, HEAT_DECAY = 0.35, LOCK_TIME = 3, COUNTDOWN = 2.4;
     const PLAYERS = [
       { name: "Синий", color: "#2f6bff", dark: "#1c47b8" },
       { name: "Красный", color: "#ff3b4e", dark: "#b81f30" },
     ];
-    const VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-    const ANGLE = { up: -Math.PI / 2, down: Math.PI / 2, left: Math.PI, right: 0 };
-    // player 2 sits opposite, so their local directions are rotated 180° on screen
-    const FLIP = { up: "down", down: "up", left: "right", right: "left" };
+    const HEAT = "#ff9f1a";
 
-    // bottom half (rows 8..15); top half is the 180° rotation for a fair map
-    const BOTTOM = [
-      "....#..#....",
-      ".##......##.",
-      ".#...##...#.",
-      "............",
-      "...#....#...",
-      "..#......#..",
-      "............",
-      "............",
+    // bottom-half walls; each is mirrored by a 180° rotation so the map is fair
+    const HALF = [
+      { x: 1, y: 9.6, w: 3, h: 0.6 },
+      { x: 8.4, y: 11.2, w: 0.6, h: 2.6 },
+      { x: 2, y: 12.6, w: 2.4, h: 0.6 },
     ];
-    const MAP = [...BOTTOM.map(r => [...r].reverse().join("")).reverse(), ...BOTTOM];
-    const wall = (cx, cy) => cx < 0 || cy < 0 || cx >= W || cy >= H || MAP[cy][cx] === "#";
+    const WALLS = [
+      { x: 5, y: 7.4, w: 2, h: 1.2 },
+      ...HALF,
+      ...HALF.map(r => ({ x: W - r.x - r.w, y: H - r.y - r.h, w: r.w, h: r.h })),
+    ];
 
-    let tanks, bullets, sparks, over, shake;
+    const $ = id => document.getElementById(id);
+    let tanks, bullets, sparks, over, shake, countdown;
 
     function reset() {
       tanks = [
-        { x: 6, y: 14.5, dir: "up", lives: LIVES, cool: 0, inv: 0, held: [], fire: false },
-        { x: 6, y: 1.5, dir: "down", lives: LIVES, cool: 0, inv: 0, held: [], fire: false },
+        { x: 6, y: 14.4, a: -Math.PI / 2, spin: 1, held: false, heat: 0, lock: 0, alive: true },
+        { x: 6, y: 1.6, a: Math.PI / 2, spin: 1, held: false, heat: 0, lock: 0, alive: true },
       ];
-      bullets = []; sparks = []; over = false; shake = 0;
-      document.querySelectorAll(".on").forEach(b => b.classList.remove("on"));
+      bullets = []; sparks = []; over = false; shake = 0; countdown = COUNTDOWN;
+      document.querySelectorAll(".pad").forEach(b => b.classList.remove("on", "hot"));
       $("over").hidden = true;
-      renderLives();
     }
-    const $ = id => document.getElementById(id);
 
-    /* ---------- controls ---------- */
-    const ARROW = '<svg viewBox="0 0 24 24"><path d="M12 5l8 11H4z"/></svg>';
-    const ROT = { up: 0, right: 90, down: 180, left: 270 };
-    document.querySelectorAll(".panel").forEach(panel => {
-      const p = +panel.dataset.p;
-      panel.innerHTML = `
-        <div class="dpad">${["up", "left", "right", "down"].map(d =>
-          `<button class="dir" data-d="${d}" aria-label="${d}">${ARROW}</button>`).join("")}</div>
-        <div class="info"><div class="name">${PLAYERS[p].name}</div><div class="lives">${'<span class="life"></span>'.repeat(LIVES)}</div></div>
-        <button class="fire" aria-label="Огонь">ОГОНЬ</button>`;
-      panel.querySelectorAll(".dir").forEach(btn => {
-        btn.querySelector("svg").style.transform = `rotate(${ROT[btn.dataset.d]}deg)`;
-        const d = p === 1 ? FLIP[btn.dataset.d] : btn.dataset.d;
-        hold(btn, () => press(p, d), () => release(p, d));
-      });
-      hold(panel.querySelector(".fire"), () => { tanks[p].fire = true; }, () => { tanks[p].fire = false; });
-    });
+    /* ---------- input: one button per player ---------- */
+    function press(p) {
+      const t = tanks[p];
+      if (t.held) return;
+      t.held = true;
+      if (!over && countdown <= 0 && t.lock <= 0) shoot(t, p);
+    }
+    function release(p) {
+      const t = tanks[p];
+      if (!t.held) return;
+      t.held = false;
+      t.spin = -t.spin;
+    }
 
-    function hold(btn, down, up) {
+    document.querySelectorAll(".pad").forEach(btn => {
+      const p = +btn.dataset.p;
       btn.addEventListener("pointerdown", e => {
         e.preventDefault();
         btn.setPointerCapture(e.pointerId);
         btn.classList.add("on");
-        down();
+        press(p);
       });
-      const end = () => { if (btn.classList.contains("on")) { btn.classList.remove("on"); up(); } };
+      const end = () => { if (btn.classList.contains("on")) { btn.classList.remove("on"); release(p); } };
       btn.addEventListener("pointerup", end);
       btn.addEventListener("pointercancel", end);
       btn.addEventListener("lostpointercapture", end);
       btn.addEventListener("contextmenu", e => e.preventDefault());
-    }
-    function press(p, d) { const h = tanks[p].held; if (!h.includes(d)) h.push(d); }
-    function release(p, d) { const h = tanks[p].held, i = h.indexOf(d); if (i >= 0) h.splice(i, 1); }
+    });
 
-    const KEYS = {
-      KeyW: [0, "up"], KeyS: [0, "down"], KeyA: [0, "left"], KeyD: [0, "right"], Space: [0, "fire"],
-      ArrowUp: [1, "up"], ArrowDown: [1, "down"], ArrowLeft: [1, "left"], ArrowRight: [1, "right"], Enter: [1, "fire"],
-    };
+    const KEYS = { Space: 0, Enter: 1 };
     addEventListener("keydown", e => {
-      const k = KEYS[e.code]; if (!k || e.repeat) return;
-      e.preventDefault();
-      k[1] === "fire" ? (tanks[k[0]].fire = true) : press(k[0], k[1]);
+      if (!(e.code in KEYS) || e.repeat || !$("over").hidden) return;
+      e.preventDefault(); press(KEYS[e.code]);
     });
-    addEventListener("keyup", e => {
-      const k = KEYS[e.code]; if (!k) return;
-      k[1] === "fire" ? (tanks[k[0]].fire = false) : release(k[0], k[1]);
-    });
+    addEventListener("keyup", e => { if (e.code in KEYS) release(KEYS[e.code]); });
 
     /* ---------- physics ---------- */
-    function blocked(x, y, self) {
-      const h = TANK / 2;
-      if (x - h < 0 || y - h < 0 || x + h > W || y + h > H) return true;
-      for (let cy = Math.floor(y - h); cy <= Math.floor(y + h - 1e-6); cy++)
-        for (let cx = Math.floor(x - h); cx <= Math.floor(x + h - 1e-6); cx++)
-          if (wall(cx, cy)) return true;
-      const o = tanks[1 - self];
-      return Math.abs(o.x - x) < TANK && Math.abs(o.y - y) < TANK;
+    function circleHitsRect(x, y, r, w) {
+      const cx = Math.max(w.x, Math.min(x, w.x + w.w)), cy = Math.max(w.y, Math.min(y, w.y + w.h));
+      return (x - cx) ** 2 + (y - cy) ** 2 < r * r;
     }
-
-    function moveTank(t, i, dt) {
-      const d = t.held[t.held.length - 1];
-      if (!d) return;
-      t.dir = d;
-      const [vx, vy] = VEC[d], s = SPEED * dt;
-      const nx = t.x + vx * s, ny = t.y + vy * s;
-      if (!blocked(nx, ny, i)) { t.x = nx; t.y = ny; return; }
-      // corner assist: slide toward the lane center so 1-cell gaps are easy to enter
-      if (vx) {
-        const c = Math.floor(t.y) + 0.5, off = c - t.y;
-        if (Math.abs(off) > 1e-3 && Math.abs(off) < 0.42 && !blocked(t.x, t.y + Math.sign(off) * Math.min(s, Math.abs(off)), i))
-          t.y += Math.sign(off) * Math.min(s, Math.abs(off));
-      } else {
-        const c = Math.floor(t.x) + 0.5, off = c - t.x;
-        if (Math.abs(off) > 1e-3 && Math.abs(off) < 0.42 && !blocked(t.x + Math.sign(off) * Math.min(s, Math.abs(off)), t.y, i))
-          t.x += Math.sign(off) * Math.min(s, Math.abs(off));
-      }
+    function solid(x, y, r) {
+      return x - r < 0 || y - r < 0 || x + r > W || y + r > H || WALLS.some(w => circleHitsRect(x, y, r, w));
+    }
+    function blocked(x, y, i) {
+      const o = tanks[1 - i];
+      return solid(x, y, R) || (o.alive && Math.hypot(o.x - x, o.y - y) < R * 2);
     }
 
     function shoot(t, i) {
-      if (t.cool > 0 || bullets.filter(b => b.owner === i).length >= MAX_BULLETS) return;
-      t.cool = COOLDOWN;
-      const [vx, vy] = VEC[t.dir];
-      const bx = t.x + vx * 0.55, by = t.y + vy * 0.55;
-      if (wall(Math.floor(bx), Math.floor(by))) return spark(bx, by, PLAYERS[i].color);
-      bullets.push({ x: bx, y: by, vx: vx * BULLET_SPEED, vy: vy * BULLET_SPEED, owner: i });
+      const bx = t.x + Math.cos(t.a) * (R + 0.2), by = t.y + Math.sin(t.a) * (R + 0.2);
+      t.heat += HEAT_PER_SHOT;
+      if (t.heat >= 1) { t.lock = LOCK_TIME; t.heat = 1; }
+      if (solid(bx, by, BULLET_R)) return spark(bx, by, "#8a8a84");
+      bullets.push({ x: bx, y: by, vx: Math.cos(t.a) * BULLET_SPEED, vy: Math.sin(t.a) * BULLET_SPEED, owner: i });
     }
 
-    function spark(x, y, color, n = 6) {
+    function spark(x, y, color, n = 6, power = 3) {
       for (let k = 0; k < n; k++) {
-        const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 3;
-        sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.35, color });
+        const a = Math.random() * Math.PI * 2, v = 1 + Math.random() * power;
+        sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, color, size: 3 + Math.random() * 4 });
       }
     }
 
-    function hit(i, b) {
+    function destroy(i) {
       const t = tanks[i];
-      t.lives--; t.inv = INVULN; shake = 0.25;
-      spark(b.x, b.y, PLAYERS[i].color, 14);
-      try { navigator.vibrate && navigator.vibrate(80); } catch {}
-      renderLives();
-      if (t.lives <= 0) {
-        over = true;
-        setTimeout(() => showWinner(1 - i), 700);
-      }
+      t.alive = false; over = true; shake = 0.4;
+      spark(t.x, t.y, PLAYERS[i].color, 26, 5);
+      spark(t.x, t.y, HEAT, 12, 4);
+      try { navigator.vibrate && navigator.vibrate(150); } catch {}
+      setTimeout(() => showWinner(1 - i), 900);
     }
 
     function update(dt) {
+      if (countdown > 0) countdown -= dt;
+      const live = countdown <= 0 && !over;
+
       tanks.forEach((t, i) => {
-        t.cool = Math.max(0, t.cool - dt);
-        t.inv = Math.max(0, t.inv - dt);
-        if (over) return;
-        moveTank(t, i, dt);
-        if (t.fire) shoot(t, i);
+        if (!t.alive) return;
+        if (t.lock > 0) {
+          t.lock -= dt;
+          if (t.lock <= 0) { t.lock = 0; t.heat = 0; }
+          return;
+        }
+        t.heat = Math.max(0, t.heat - HEAT_DECAY * dt);
+        if (!live) return;
+        if (t.held) {
+          const dx = Math.cos(t.a) * SPEED * dt, dy = Math.sin(t.a) * SPEED * dt;
+          if (!blocked(t.x + dx, t.y + dy, i)) { t.x += dx; t.y += dy; }
+          else if (!blocked(t.x + dx, t.y, i)) t.x += dx;
+          else if (!blocked(t.x, t.y + dy, i)) t.y += dy;
+        } else {
+          t.a += t.spin * TURN * dt;
+        }
       });
 
-      // substep bullets so fast shots never tunnel through a wall
+      // substeps keep fast bullets from skipping through thin walls
       const steps = 4;
       for (let s = 0; s < steps; s++) {
         for (const b of bullets) {
           if (b.dead) continue;
           b.x += b.vx * dt / steps; b.y += b.vy * dt / steps;
-          if (wall(Math.floor(b.x), Math.floor(b.y))) { b.dead = true; spark(b.x, b.y, "#8a8a84"); continue; }
+          if (solid(b.x, b.y, BULLET_R)) { b.dead = true; spark(b.x, b.y, "#8a8a84"); continue; }
           tanks.forEach((t, i) => {
-            if (b.dead || i === b.owner || t.lives <= 0) return;
-            const h = TANK / 2 + BULLET_R;
-            if (Math.abs(b.x - t.x) < h && Math.abs(b.y - t.y) < h) {
+            if (b.dead || i === b.owner || !t.alive) return;
+            if (Math.hypot(b.x - t.x, b.y - t.y) < R + BULLET_R) {
               b.dead = true;
-              if (t.inv <= 0 && !over) hit(i, b); else spark(b.x, b.y, "#8a8a84");
+              if (!over) destroy(i);
             }
           });
         }
@@ -278,9 +236,15 @@
       }
       bullets = bullets.filter(b => !b.dead);
 
-      sparks.forEach(s => { s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; });
+      sparks.forEach(s => { s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.92; s.vy *= 0.92; s.life -= dt; });
       sparks = sparks.filter(s => s.life > 0);
       shake = Math.max(0, shake - dt);
+
+      document.querySelectorAll(".pad").forEach(btn => {
+        const t = tanks[+btn.dataset.p], hot = t.lock > 0;
+        btn.classList.toggle("hot", hot);
+        btn.querySelector(".label").textContent = hot ? `ПЕРЕГРЕВ ${Math.ceil(t.lock)}` : "ЖМИ";
+      });
     }
 
     /* ---------- render ---------- */
@@ -300,9 +264,36 @@
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); ctx.fill();
     }
 
-    function draw() {
+    function drawTank(t, i, now) {
+      const P = PLAYERS[i], s = R * 2 * U;
+      const locked = t.lock > 0, flash = locked && Math.floor(now / 150) % 2;
+
+      if (t.heat > 0) {
+        ctx.save();
+        ctx.lineWidth = 4; ctx.lineCap = "round";
+        if (locked) { ctx.shadowColor = HEAT; ctx.shadowBlur = 18; }
+        ctx.strokeStyle = HEAT; ctx.globalAlpha = locked ? 1 : 0.85;
+        const frac = locked ? t.lock / LOCK_TIME : t.heat;
+        ctx.beginPath();
+        ctx.arc(t.x * U, t.y * U, s * 0.78, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       ctx.save();
-      if (shake > 0) ctx.translate((Math.random() - .5) * shake * 16, (Math.random() - .5) * shake * 16);
+      ctx.translate(t.x * U, t.y * U);
+      ctx.rotate(t.a);
+      ctx.fillStyle = flash ? HEAT : P.color;
+      rrect(-s * 0.5, -s * 0.42, s, s * 0.84, s * 0.16);
+      ctx.fillStyle = P.dark;
+      rrect(0, -s * 0.09, s * 0.78, s * 0.18, s * 0.05);
+      ctx.beginPath(); ctx.arc(0, 0, s * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    function draw(now) {
+      ctx.save();
+      if (shake > 0) ctx.translate((Math.random() - .5) * shake * 20, (Math.random() - .5) * shake * 20);
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W * U, H * U);
 
       ctx.strokeStyle = "#e6e6e0"; ctx.lineWidth = 2; ctx.setLineDash([8, 8]);
@@ -310,23 +301,9 @@
       ctx.setLineDash([]);
 
       ctx.fillStyle = "#d4d4cd";
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
-        if (MAP[y][x] === "#") rrect(x * U + 1.5, y * U + 1.5, U - 3, U - 3, U * 0.18);
+      WALLS.forEach(w => rrect(w.x * U, w.y * U, w.w * U, w.h * U, Math.min(w.w, w.h) * U * 0.3));
 
-      tanks.forEach((t, i) => {
-        if (t.lives <= 0) { ctx.globalAlpha = 0.25; }
-        else if (t.inv > 0 && Math.floor(t.inv * 12) % 2) return;
-        const P = PLAYERS[i], s = TANK * U;
-        ctx.save();
-        ctx.translate(t.x * U, t.y * U);
-        ctx.rotate(ANGLE[t.dir]);
-        ctx.fillStyle = P.color; rrect(-s / 2, -s / 2, s, s, s * 0.18);
-        ctx.fillStyle = P.dark;
-        rrect(0, -s * 0.09, s * 0.72, s * 0.18, s * 0.05);
-        ctx.beginPath(); ctx.arc(0, 0, s * 0.26, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        ctx.globalAlpha = 1;
-      });
+      tanks.forEach((t, i) => t.alive && drawTank(t, i, now));
 
       bullets.forEach(b => {
         ctx.fillStyle = PLAYERS[b.owner].dark;
@@ -334,19 +311,19 @@
       });
 
       sparks.forEach(s => {
-        ctx.globalAlpha = Math.max(0, s.life / 0.35);
+        ctx.globalAlpha = Math.max(0, s.life / 0.5);
         ctx.fillStyle = s.color;
-        ctx.fillRect(s.x * U - 2, s.y * U - 2, 4, 4);
+        ctx.fillRect(s.x * U - s.size / 2, s.y * U - s.size / 2, s.size, s.size);
       });
       ctx.globalAlpha = 1;
-      ctx.restore();
-    }
 
-    function renderLives() {
-      document.querySelectorAll(".panel").forEach(panel => {
-        const t = tanks[+panel.dataset.p];
-        panel.querySelectorAll(".life").forEach((el, k) => el.classList.toggle("lost", k >= t.lives));
-      });
+      if (countdown > 0) {
+        ctx.fillStyle = "rgba(26,26,26,.85)";
+        ctx.font = `800 ${U * 3}px Inter, system-ui, sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(Math.ceil(countdown / (COUNTDOWN / 3)), W / 2 * U, H / 2 * U);
+      }
+      ctx.restore();
     }
 
     function showWinner(i) {
@@ -361,7 +338,7 @@
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       update(dt);
-      draw();
+      draw(now);
       requestAnimationFrame(loop);
     }
 
